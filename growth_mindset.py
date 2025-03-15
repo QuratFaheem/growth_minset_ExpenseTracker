@@ -1,76 +1,84 @@
 import csv
 import os
 import pandas as pd
+import streamlit as st
 from datetime import datetime
 
+# File to store expenses
+file_name = "expenses.csv"
 
-file_name="expenses.csv"
-
+# Ensure CSV file exists
 if not os.path.exists(file_name):
-    with open(file_name,"w",newline='') as file:
+    with open(file_name, "w", newline="") as file:
         writer = csv.writer(file)
-        writer.writerow(['Date','Amount','Category','Description'])
+        writer.writerow(["Date", "Amount", "Category", "Description"])
 
-def add_expense():
-    date=datetime.today().strftime('%Y-%m-%d')
-    amount=input("Enter the amount: ")
-    category=input("Enter the category: (Food, Travel, Rent, Bills, Others) ")
-    description=input("Enter the description: ")
+# Function to load expenses
+def load_expenses():
+    return pd.read_csv(file_name)
 
-    with open(file_name,"a",newline='') as file:
-        writer=csv.writer(file)
-        writer.writerow([date,amount,category,description])
+# Function to add an expense
+def add_expense(amount, category, description):
+    date = datetime.today().strftime("%Y-%m-%d")
+    
+    with open(file_name, "a", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow([date, amount, category, description])
+    
+    st.success("✅ Expense added successfully!")
 
-        print("✅Expense added successfully")
-
-
-def view_expenses():
-    df=pd.read_csv(file_name)
+# Function to get total spending
+def total_spending(df):
     if df.empty:
-        print("No expenses recorded yet.")
-    else:
-        print(df)
+        return 0
+    return df["Amount"].astype(float).sum()
 
-def total_spending():
-    df= pd.read_csv(file_name)
+# Function to get category-wise spending
+def category_wise_spending(df):
     if df.empty:
-        print("No expenses recorded yet.")
-    else:
-        total=df["Amount"].astype(float).sum()
-        print(f"💰Total spending: ${total}")
+        return pd.DataFrame(columns=["Category", "Amount"])
+    return df.groupby("Category")["Amount"].sum().reset_index()
 
-def category_wise_spending():
-    df = pd.read_csv(file_name)
-    if df.empty:
-        print("No expenses recorded yet.")
-    else:
-        category_sum = df.groupby("Category")["Amount"].sum()  # Group by category and sum amounts
-        print(category_sum)
+# Streamlit UI
+st.title("💰 Simple Expense Tracker")
+st.header("Menu")
 
-def main():
-    while True:
-        print("\nExpense Tracker Menu:")
-        print("1. Add Expense")
-        print("2. View Expenses")
-        print("3. Total Spending")
-        print("4. Category-wise Spending")
-        print("5. Exit")
 
-        choice = input("Choose an option: ")
+menu = st.radio("Select an option:", ["Add Expense", "View Expenses", "Total Spending", "Category-wise Spending"])
 
-        if choice == "1":
-            add_expense()
-        elif choice == "2":
-            view_expenses()
-        elif choice == "3":
-            total_spending()
-        elif choice == "4":
-            category_wise_spending()
-        elif choice == "5":
-            print("Goodbye! 👋")
-            break
+# Load the expenses data
+df = load_expenses()
+
+if menu == "Add Expense":
+    st.subheader("📌 Add New Expense")
+    
+    amount = st.number_input("Enter Amount:", min_value=0.01, step=0.01)
+    category = st.selectbox("Select Category:", ["Food", "Travel", "Bills", "Shopping", "Other"])
+    description = st.text_input("Enter Description:")
+    
+    if st.button("Add Expense"):
+        if amount and category:
+            add_expense(amount, category, description)
         else:
-            print("Invalid choice! Please try again.")
+            st.warning("⚠️ Please enter all required fields!")
 
-if __name__ == "__main__":
-    main()
+elif menu == "View Expenses":
+    st.subheader("📊 All Expenses")
+    if df.empty:
+        st.info("No expenses recorded yet.")
+    else:
+        st.dataframe(df)
+
+elif menu == "Total Spending":
+    st.subheader("💸 Total Spending")
+    total = total_spending(df)
+    st.metric(label="Total Spending", value=f"Rs. {total}")
+
+elif menu == "Category-wise Spending":
+    st.subheader("📊 Category-wise Spending")
+    category_summary = category_wise_spending(df)
+    if category_summary.empty:
+        st.info("No expenses recorded yet.")
+    else:
+        st.dataframe(category_summary)
+
